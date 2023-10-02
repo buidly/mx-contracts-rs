@@ -20,12 +20,25 @@ pub trait NftEscrowContract {
 
     #[payable("*")]
     #[endpoint]
-    fn escrow(&self, wanted_nft: TokenIdentifier, wanted_nonce: u64, wanted_address: ManagedAddress) {
+    fn escrow(
+        &self,
+        wanted_nft: TokenIdentifier,
+        wanted_nonce: u64,
+        wanted_address: ManagedAddress,
+    ) -> u32 {
         let payment = self.call_value().single_esdt();
 
-        require!(payment.token_nonce > 0 && payment.amount == 1, "ESDT is not an NFT");
+        require!(
+            payment.token_nonce > 0 && payment.amount == 1,
+            "ESDT is not an NFT"
+        );
 
         let creator = self.blockchain().get_caller();
+
+        require!(
+            creator != wanted_address,
+            "Wanted address should not be the same as the caller"
+        );
 
         let offer_id = self.last_offer_id().update(|v| {
             *v += 1;
@@ -46,6 +59,8 @@ pub trait NftEscrowContract {
         };
 
         self.offers(offer_id).set(offer);
+
+        offer_id
     }
 
     #[endpoint]
@@ -58,14 +73,23 @@ pub trait NftEscrowContract {
 
         let offer = offers_mapper.get();
 
-        require!(offer.creator == caller, "Only the offer creator can cancel it");
+        require!(
+            offer.creator == caller,
+            "Only the offer creator can cancel it"
+        );
 
         self.created_offers(&caller).swap_remove(&offer_id);
-        self.wanted_offers(&offer.wanted_address).swap_remove(&offer_id);
+        self.wanted_offers(&offer.wanted_address)
+            .swap_remove(&offer_id);
 
         self.offers(offer_id).clear();
 
-        self.send().direct_esdt(&offer.creator, &offer.nft, offer.nonce, &BigUint::from(1u64));
+        self.send().direct_esdt(
+            &offer.creator,
+            &offer.nft,
+            offer.nonce,
+            &BigUint::from(1u64),
+        );
     }
 
     #[payable("*")]
@@ -83,20 +107,38 @@ pub trait NftEscrowContract {
 
         let payment = self.call_value().single_esdt();
 
-        require!(payment.token_nonce > 0 && payment.amount == 1, "ESDT is not an NFT");
-        require!(payment.token_identifier == offer.wanted_nft && payment.token_nonce == offer.wanted_nonce, "NFT does not match");
+        require!(
+            payment.token_identifier == offer.wanted_nft
+                && payment.token_nonce == offer.wanted_nonce
+                && payment.amount == 1,
+            "NFT does not match"
+        );
 
         self.created_offers(&offer.creator).swap_remove(&offer_id);
-        self.wanted_offers(&offer.wanted_address).swap_remove(&offer_id);
+        self.wanted_offers(&offer.wanted_address)
+            .swap_remove(&offer_id);
 
         self.offers(offer_id).clear();
 
-        self.send().direct_esdt(&offer.creator, &payment.token_identifier, payment.token_nonce, &payment.amount);
-        self.send().direct_esdt(&offer.wanted_address, &offer.nft, offer.nonce, &BigUint::from(1u64));
+        self.send().direct_esdt(
+            &offer.creator,
+            &payment.token_identifier,
+            payment.token_nonce,
+            &payment.amount,
+        );
+        self.send().direct_esdt(
+            &offer.wanted_address,
+            &offer.nft,
+            offer.nonce,
+            &BigUint::from(1u64),
+        );
     }
 
     #[view(getCreatedOffers)]
-    fn get_created_offers(&self, address: ManagedAddress) -> MultiValueEncoded<MultiValue2<u32, Offer<Self::Api>>> {
+    fn get_created_offers(
+        &self,
+        address: ManagedAddress,
+    ) -> MultiValueEncoded<MultiValue2<u32, Offer<Self::Api>>> {
         let mut result = MultiValueEncoded::new();
 
         for offer_id in self.created_offers(&address).iter() {
@@ -107,7 +149,10 @@ pub trait NftEscrowContract {
     }
 
     #[view(getWantedOffers)]
-    fn get_wanted_offers(&self, address: ManagedAddress) -> MultiValueEncoded<MultiValue2<u32, Offer<Self::Api>>> {
+    fn get_wanted_offers(
+        &self,
+        address: ManagedAddress,
+    ) -> MultiValueEncoded<MultiValue2<u32, Offer<Self::Api>>> {
         let mut result = MultiValueEncoded::new();
 
         for offer_id in self.wanted_offers(&address).iter() {
@@ -118,11 +163,11 @@ pub trait NftEscrowContract {
     }
 
     #[view]
-    #[storage_mapper("created_offers")]
+    #[storage_mapper("createdOffers")]
     fn created_offers(&self, address: &ManagedAddress) -> UnorderedSetMapper<u32>;
 
     #[view]
-    #[storage_mapper("wanted_offers")]
+    #[storage_mapper("wantedOffers")]
     fn wanted_offers(&self, address: &ManagedAddress) -> UnorderedSetMapper<u32>;
 
     #[view]
