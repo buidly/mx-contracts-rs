@@ -74,7 +74,7 @@
             "step": "checkState",
             "accounts": {
                 "address:first": {
-                    "nonce": "6",
+                    "nonce": "7",
                     "balance": "0",
                     "esdt": {
                         "str:FUNG-123456": "1000",

@@ -32,6 +32,7 @@ pub trait NftEscrowContract {
             payment.token_nonce > 0 && payment.amount == 1,
             "ESDT is not an NFT"
         );
+        require!(wanted_nonce > 0, "Wanted ESDT is not an NFT");
 
         let creator = self.blockchain().get_caller();
 
